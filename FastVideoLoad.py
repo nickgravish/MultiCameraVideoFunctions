@@ -23,8 +23,6 @@ class FastVideoLoad(Thread):
 
         self.frames = np.zeros((self.NumFrames, self.Height, self.Width), np.uint8)
 
-
-
     def run(self):
         print("Starting " + self.name)
 
@@ -38,10 +36,16 @@ class FastVideoLoad(Thread):
                 print('thread ', self.thread_id, '    ', kk)
 
     def getFrame(self, ind):
-
         return self.frames[ind, :, :]
 
+    def getNumFrames(self):
+        return self.NumFrames
 
+    def getHeight(self):
+        return self.Height
+
+    def getWidth(self):
+        return self.Width
 
 
 if __name__ == '__main__':
