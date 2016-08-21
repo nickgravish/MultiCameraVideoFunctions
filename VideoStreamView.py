@@ -3,31 +3,29 @@
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
+from FastVideoLoad import FastVideoLoad
 
 import cv2 as cv
 import os
 
 
 class VideoStreamView(pg.ImageView):
+    """
+    This will take in a video container that will handle the loading. This way
+    VideoStreamView class is agnostic to how videos are handled/loaded
 
+
+    """
     sigIndexChanged = QtCore.Signal(object)
 
-    def __init__(self, vidname, transpose = False):
+    def __init__(self, video, transpose = False):
         super().__init__()
 
+        self.video = video
         self.transpose = transpose
-        self.videostream = vidname
-        self.videomode = os.path.isfile(vidname) # determine if passed in videos or directory with images
-
-        if self.videomode == True:
-            self.vid = cv.VideoCapture(self.videostream)
-            self.NUMFRAMES = self.vid.get(cv.CAP_PROP_FRAME_COUNT)
-
-        else:
-            self.file_list = [name for name in os.listdir(self.videostream)
-                              if os.path.isfile(os.path.join(self.videostream,name))]
-            self.NUMFRAMES = len(self.file_list)
-
+        self.NumFrames = self.video.getNumFrames()
+        self.Height = self.video.getHeight()
+        self.Width = self.video.getWidth()
 
         self.image = None
         self.loadFrame(1)
@@ -43,23 +41,32 @@ class VideoStreamView(pg.ImageView):
 
     def loadFrame(self, index):
 
-        if self.videomode == True :
-            self.vid.set(cv.CAP_PROP_POS_FRAMES, index)
-            tru, img = self.vid.read(1)
-            img = img[:, :, 0]
+        img = self.video.getFrame(index)
 
-        else:
-            img = cv.imread(os.path.join(self.videostream, self.file_list[index]), cv.IMREAD_GRAYSCALE)
-            self.image = np.array(img)
+        if self.transpose:
+            img = img.T
 
-            if self.image is not None:
-                tru = True
+        self.image = img
 
-        if tru:
-            if self.transpose:
-                img = img.T
 
-            self.image = img
+        #
+        # if self.videomode == True :
+        #     self.vid.set(cv.CAP_PROP_POS_FRAMES, index)
+        #     tru, img = self.vid.read(1)
+        #     img = img[:, :, 0]
+        #
+        # else:
+        #     img = cv.imread(os.path.join(self.videostream, self.file_list[index]), cv.IMREAD_GRAYSCALE)
+        #     self.image = np.array(img)
+        #
+        #     if self.image is not None:
+        #         tru = True
+        #
+        # if tru:
+        #     if self.transpose:
+        #         img = img.T
+        #
+        #     self.image = img
 
 
     def jumpFrames(self, n):
@@ -107,7 +114,7 @@ class VideoStreamView(pg.ImageView):
         self.image = img
         self.imageDisp = None
 
-        self.tVals = np.arange(self.NUMFRAMES)
+        self.tVals = np.arange(self.NumFrames)
 
 
         self.axes = {'t': 0, 'x': 1, 'y': 2, 'c': None}
@@ -176,7 +183,7 @@ class VideoStreamView(pg.ImageView):
 
     def setCurrentIndex(self, ind):
         """Set the currently displayed frame index."""
-        self.currentIndex = np.clip(ind, 0, self.NUMFRAMES - 1)
+        self.currentIndex = np.clip(ind, 0, self.NumFrames - 1)
 
         self.loadFrame(self.currentIndex)
 
@@ -200,48 +207,47 @@ class VideoStreamView(pg.ImageView):
         self.sigTimeChanged.emit(ind, time)
 
 
-# vidlist = ['/Users/nickgravish/Dropbox/Harvard/HighThroughputExpt/2016-08-05_12.41.20/1_08-05-16_12-41-31.770_Fri_Aug_05_12-41-20.543_115.mp4',
-#            '/Users/nickgravish/Dropbox/Harvard/HighThroughputExpt/2016-08-05_12.41.20/2_08-05-16_12-41-30.951_Fri_Aug_05_12-41-20.548_115.mp4']
-
-vidlist = ['/Users/nickgravish/Dropbox/Harvard/HighThroughputExpt/2016-08-05_12.41.20/1/',
-           '/Users/nickgravish/Dropbox/Harvard/HighThroughputExpt/2016-08-05_12.41.20/2/']
-
-## Always start by initializing Qt (only once per application)
-app = QtGui.QApplication([])
-
-## Define a top-level widget to hold everything
-w = QtGui.QWidget()
-w.resize(1200,600)
-w.move(QtGui.QApplication.desktop().screen().rect().center()- w.rect().center())
-
-## Create image view widgets
-imviews = [VideoStreamView(vid, transpose=True) for vid in vidlist]
-
-## Create a grid layout to manage the widgets size and position
-layout = QtGui.QGridLayout()
-w.setLayout(layout)
-
-## Add widgets to the layout in their proper positions
-[layout.addWidget(imv, kk % (len(imviews) / 2), int(kk >= len(imviews) / 2)) for kk, imv in enumerate(imviews)]
-
-w.show()
-
-# [imv.play(50) for imv in imviews]
-
-imviews[0].sigIndexChanged.connect(imviews[1].setCurrentIndex)
-# imviews[1].sigIndexChanged.connect(imviews[0].setCurrentIndex)
-
-imviews[0].sigTimeChanged.connect(imviews[1].setCurrentIndex)
-imviews[1].sigTimeChanged.connect(imviews[0].setCurrentIndex)
-
-
-imviews[0].play(50)
-
-
 ## Start Qt event loop unless running in interactive mode.
 if __name__ == '__main__':
 
     import sys
+
+    # vidlist = ['/Users/nickgravish/Dropbox/Harvard/HighThroughputExpt/2016-08-05_12.41.20/1_08-05-16_12-41-31.770_Fri_Aug_05_12-41-20.543_115.mp4',
+    #            '/Users/nickgravish/Dropbox/Harvard/HighThroughputExpt/2016-08-05_12.41.20/2_08-05-16_12-41-30.951_Fri_Aug_05_12-41-20.548_115.mp4']
+
+    vidlist = ['/Users/nickgravish/Dropbox/Harvard/HighThroughputExpt/2016-08-05_12.41.20/1/',
+               '/Users/nickgravish/Dropbox/Harvard/HighThroughputExpt/2016-08-05_12.41.20/2/']
+
+    ## Always start by initializing Qt (only once per application)
+    app = QtGui.QApplication([])
+
+    ## Define a top-level widget to hold everything
+    w = QtGui.QWidget()
+    w.resize(1200, 600)
+    w.move(QtGui.QApplication.desktop().screen().rect().center() - w.rect().center())
+
+    ## Create image view widgets
+    imviews = [VideoStreamView(vid, transpose=True) for vid in vidlist]
+
+    ## Create a grid layout to manage the widgets size and position
+    layout = QtGui.QGridLayout()
+    w.setLayout(layout)
+
+    ## Add widgets to the layout in their proper positions
+    [layout.addWidget(imv, kk % (len(imviews) / 2), int(kk >= len(imviews) / 2)) for kk, imv in enumerate(imviews)]
+
+    w.show()
+
+    # [imv.play(50) for imv in imviews]
+
+    imviews[0].sigIndexChanged.connect(imviews[1].setCurrentIndex)
+    # imviews[1].sigIndexChanged.connect(imviews[0].setCurrentIndex)
+
+    imviews[0].sigTimeChanged.connect(imviews[1].setCurrentIndex)
+    imviews[1].sigTimeChanged.connect(imviews[0].setCurrentIndex)
+
+    imviews[0].play(50)
+
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
